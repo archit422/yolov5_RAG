@@ -8,20 +8,18 @@ import numpy as np
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from rank_bm25 import BM25Okapi
 
-# —— CONFIGURATION & HYPERPARAMETERS —— #
 CHUNKS_PATH    = "artifacts/chunks.pkl"
 EMB_PATH       = "artifacts/embeddings.npy"
 INDEX_PATH     = "artifacts/local_index.faiss"
 EMBED_MODEL    = "BAAI/bge-large-en-v1.5"  # Better semantic search model
-RERANK_MODEL   = "cross-encoder/ms-marco-MiniLM-L-6-v2"  # Cross-encoder for reranking
-DIM            = 1024  # Updated for bge-large
+RERANK_MODEL   = "cross-encoder/ms-marco-MiniLM-L-6-v2" 
+DIM            = 1024 
 
-# Hybrid-search hyperparams
-K_LEX          = 100     # Increased from 30 to consider more lexical matches
-MIN_LEX_MATCH  = 2       # Stricter lexical filtering
-K_CAND         = 200     # Broader semantic search
-K_FINAL        = 10      # More comprehensive results
-RERANK_K       = 50      # Number of candidates to rerank
+K_LEX          = 100     
+MIN_LEX_MATCH  = 2       
+K_CAND         = 200    
+K_FINAL        = 10      
+RERANK_K       = 50    
 
 # Reranking weights
 LEX_BONUS_EXACT = 1.0    # Bonus for exact token matches
@@ -29,7 +27,6 @@ LEX_BONUS_PARTIAL = 0.3  # Bonus for partial matches
 TAG_BONUS = 0.2         # Bonus for tag matches
 NAME_BONUS = 0.5        # Bonus for matches in function/class names
 
-# --- File and tag routing for YOLOv5 ---
 ordered_file_keys = [
     ("train", "train.py"),
     ("val", "val.py"),
@@ -118,7 +115,6 @@ FILE_PURPOSES = {
     'hubconf.py': ['model', 'hub'],
 }
 
-# —— LOAD artifacts —— #
 with open(CHUNKS_PATH, "rb") as f:
     chunks: list["Doc"] = pickle.load(f)
 
@@ -145,10 +141,10 @@ reranker = CrossEncoder(RERANK_MODEL, local_files_only=True)
 
 def is_identifier_query(query: str) -> bool:
     pattern = r"""
-        [A-Za-z]+_[A-Za-z0-9]+         # snake_case
-      | [a-z]+[A-Z][A-Za-z]+            # camelCase
-      | [A-Za-z_]\w+\(\)             # foo_bar() or doSomething()
-      | [A-Za-z_]\w+\.[A-Za-z_]\w+    # Module.Class
+        [A-Za-z]+_[A-Za-z0-9]+  
+      | [a-z]+[A-Z][A-Za-z]+           
+      | [A-Za-z_]\w+\(\)          
+      | [A-Za-z_]\w+\.[A-Za-z_]\w+   
     """
     return bool(re.search(pattern, query, re.VERBOSE))
 
@@ -193,7 +189,7 @@ def retrieve(
     identifier_mode = is_identifier_query(q)
     q_tokens = re.findall(r"[A-Za-z_]\w*", q)
 
-    # Step 1: file-based routing
+    # file-based routing
     domain_idxs = None
     for key, filepath in ordered_file_keys:
         if key in q:
@@ -202,7 +198,7 @@ def retrieve(
                 domain_idxs = np.array(idxs, dtype=np.int64)
             break
 
-    # Step 2: tag-based routing
+    #tag-based routing
     if domain_idxs is None:
         for key, tag in KEYWORD_TO_TAG.items():
             if key in q:
@@ -214,7 +210,7 @@ def retrieve(
     if domain_idxs is None or len(domain_idxs) == 0:
         domain_idxs = np.arange(len(chunks), dtype=np.int64)
 
-    # Step 3: BM25 prefilter
+    # BM25 prefilter
     bm25_scores = bm25.get_scores(q_tokens)
     subset = domain_idxs
     lex_overlap = np.zeros(len(subset), dtype=int)
@@ -229,7 +225,6 @@ def retrieve(
     order = np.argsort(scores)[::-1]
     top_lex = eligible[order][:K_LEX] if len(order) > 0 else subset
 
-    # Step 4: semantic search
     q_emb = embedder.encode([q], convert_to_numpy=True)
     faiss.normalize_L2(q_emb)
     use_k_cand  = k_candidates if k_candidates is not None else K_CAND
@@ -243,7 +238,7 @@ def retrieve(
     sem_scores, ids = sub_index.search(q_emb, n_search)
     cand_idxs = [int(top_lex[i]) for i in ids[0]]
 
-    # Step 5: Initial rerank with lexical bonuses
+    # Initial rerank with lexical bonuses
     rerank = []
     for sc, idx in zip(sem_scores[0], cand_idxs):
         bonus = 0.0
@@ -300,7 +295,6 @@ def retrieve(
     ]
 
 
-# CLI test harness
 if __name__ == "__main__":
     q = input("Enter your code query: ")
     hits = retrieve(q)
