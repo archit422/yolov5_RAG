@@ -257,12 +257,12 @@ results = []
 for _, row in test_cases.iterrows():
     query = row["query"]
     expected = row["expected_source"]
-    print(f"\n▶ Running query: \"{query}\"  (expecting → {expected})")
+    print(f"\n Running query: \"{query}\"  (expecting → {expected})")
 
     try:
         hits = retrieve(query)
     except Exception as e:
-        print("   ⚠ retrieve() raised an exception:", e)
+        print("   retrieve() raised an exception:", e)
         results.append({
             "query":           query,
             "expected_source": expected,
