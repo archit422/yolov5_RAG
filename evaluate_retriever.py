@@ -4,25 +4,22 @@ import os
 import sys
 import pandas as pd
 
-print("🚀 Starting evaluation script...")
+print("Starting evaluation script")
 
-# 1) Ensure Python can import retrieve.py from this directory
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, PROJECT_DIR)
 
-# 1a) Inject Doc into __main__ so that retrieve.py's pickle.load finds it
 import ingest
 import __main__
 __main__.Doc = ingest.Doc
 
 try:
     from retrieve import retrieve
-    print("✅ Successfully imported retrieve()")
+    print(" Successfully imported retrieve()")
 except ImportError as e:
-    print("❌ Could not import retrieve() -", e)
+    print("Could not import retrieve() -", e)
     sys.exit(1)
 
-# 2) Define test cases (100 random (query, expected_source) pairs)
 test_cases = pd.DataFrame([
     {"query": "compute intersection over union for two bounding boxes", 
      "expected_source": "utils/metrics.py"},
@@ -253,10 +250,9 @@ test_cases = pd.DataFrame([
 ])
 
 if test_cases.empty:
-    print("❌ No test cases defined! Add at least one (query, expected_source) pair.")
+    print("No test cases defined! Add at least one (query, expected_source) pair.")
     sys.exit(1)
 
-# 3) Run each query and collect results
 results = []
 for _, row in test_cases.iterrows():
     query = row["query"]
@@ -293,14 +289,12 @@ for _, row in test_cases.iterrows():
         "error":           None
     })
 
-# 4) Build DataFrame and compute accuracy
 results_df = pd.DataFrame(results)
 accuracy = results_df["correct"].mean() * 100
 num_correct = int(results_df["correct"].sum())
 total = len(results_df)
 
-# 5) Print summary and detailed results
-print(f"\n📊 Retrieval Accuracy: {accuracy:.1f}% ({num_correct} / {total})\n")
+print(f"\n Retrieval Accuracy: {accuracy:.1f}% ({num_correct} / {total})\n")
 print("Detailed Results:")
 print("-" * 60)
 for _, row in results_df.iterrows():
