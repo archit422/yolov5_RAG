@@ -11,16 +11,13 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 import faiss
 
-# ―― CONFIGURATION ―― #
 PROJECT_ROOT  = Path(__file__).parent.resolve()
 
-# ─── where your real code lives ───
 CODE_DIRS     = [
     PROJECT_ROOT / "src",
     PROJECT_ROOT / "yolov5_src",
 ]
 
-# ─── where to dump everything ───
 ARTIFACTS_DIR = PROJECT_ROOT / "data"
 CHUNKS_PATH   = ARTIFACTS_DIR / "chunks.pkl"
 EMB_PATH      = ARTIFACTS_DIR / "embeddings.npy"
@@ -28,23 +25,16 @@ INDEX_PATH    = ARTIFACTS_DIR / "local_index.faiss"
 BI_ENCODER    = "microsoft/graphcodebert-base"
 DIM           = 768
 
-# Ensure the artifacts directory exists
 ARTIFACTS_DIR.mkdir(parents=True, exist_ok=True)
 
 class Doc:
-    """
-    Simple container for a code "chunk" plus metadata.
-    """
+
     def __init__(self, page_content: str, metadata: Dict):
         self.page_content = page_content
         self.metadata = metadata
 
 
 def extract_chunks_from_file(path: Path) -> List[Doc]:
-    """
-    Parse a Python file and extract each top‐level function/class definition as a chunk.
-    If parsing fails, treat the entire file as one chunk.
-    """
     text = path.read_text(encoding='utf-8', errors='ignore')
     try:
         tree = ast.parse(text)
@@ -84,10 +74,7 @@ def extract_chunks_from_file(path: Path) -> List[Doc]:
 
 
 def build_corpus() -> List[Doc]:
-    """
-    Walk through specified code directories, find all .py files (excluding venv or hidden),
-    and extract chunks from each.
-    """
+
     all_chunks: List[Doc] = []
     for code_dir in CODE_DIRS:
         if not code_dir.exists():
@@ -100,32 +87,30 @@ def build_corpus() -> List[Doc]:
 
 
 def ingest() -> None:
-    """
-    Build the corpus of chunks, compute embeddings, and write out FAISS index.
-    """
-    print("→ Extracting chunks from code corpus…")
-    chunks = build_corpus()
-    print(f"   → Found {len(chunks)} chunks.")
 
-    print("→ Saving chunks to disk…")
+    print(" Extracting chunks from code corpus…")
+    chunks = build_corpus()
+    print(f"    Found {len(chunks)} chunks.")
+
+    print("Saving chunks to disk…")
     with open(CHUNKS_PATH, "wb") as f:
         pickle.dump(chunks, f)
 
-    print("→ Encoding chunks with CodeBERT…")
+    print(" ncoding chunks with CodeBERT…")
     model = SentenceTransformer(BI_ENCODER, device="cpu")
     texts = [c.page_content for c in chunks]
     embeddings = model.encode(texts, convert_to_numpy=True, show_progress_bar=True)
     faiss.normalize_L2(embeddings)
 
-    print("→ Saving embeddings to disk…")
+    print("Saving embeddings to disk…")
     np.save(EMB_PATH, embeddings)
 
-    print("→ Building FAISS index…")
+    print("Building FAISS index…")
     index = faiss.IndexFlatIP(DIM)
     index.add(embeddings)
     faiss.write_index(index, str(INDEX_PATH))
 
-    print("✅ Ingestion complete.")
+    print("Ingestion complete.")
 
 
 if __name__ == "__main__":
